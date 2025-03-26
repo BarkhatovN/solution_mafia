@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -54,24 +53,27 @@ func main() {
 	if telegramURL == "" {
 		log.Fatal("TELEGRAM_URL is not set")
 	}
-
-	// Инициализация бота
 	bot, err := tgbotapi.NewBotAPI(botToken)
+
+	wh, err := tgbotapi.NewWebhook(telegramURL + "/" + botToken)
+	_, err = bot.Request(wh)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
-	// Устанавливаем Webhook для Telegram
-	bot.SetAPIEndpoint(telegramURL + "/telegram")
+	info, err := bot.GetWebhookInfo()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Обработка входящих обновлений через Webhook
-	http.HandleFunc("/telegram", func(w http.ResponseWriter, r *http.Request) {
-		var update tgbotapi.Update
-		err = json.NewDecoder(r.Body).Decode(&update)
-		if err != nil {
-			log.Println("Failed to decode update:", err)
-			return
-		}
+	if info.LastErrorDate != 0 {
+		log.Printf("Telegram callback failed: %s", info.LastErrorMessage)
+	}
+
+	updates := bot.ListenForWebhook("/" + bot.Token)
+
+	for update := range updates {
+		log.Printf("%+v\n", update)
 
 		if update.Message != nil {
 			// Обработка сообщений
@@ -94,7 +96,7 @@ func main() {
 			}
 			bot.Send(msg)
 		}
-	})
+	}
 
 	// Health Check endpoint для Cloud Run
 	http.HandleFunc("/health", healthCheck)
