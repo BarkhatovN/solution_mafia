@@ -70,33 +70,36 @@ func main() {
 		log.Printf("Telegram callback failed: %s", info.LastErrorMessage)
 	}
 
-	updates := bot.ListenForWebhook("/" + bot.Token)
+	// Запуск прослушивания обновлений в горутине
+	go func() {
+		updates := bot.ListenForWebhook("/" + bot.Token)
 
-	for update := range updates {
-		log.Printf("%+v\n", update)
+		for update := range updates {
+			log.Printf("%+v\n", update)
 
-		if update.Message != nil {
-			// Обработка сообщений
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
-			if update.Message.Text == "/start" {
-				msg.Text = "Привет! Введи количество игроков (от 8 до 10), и я раздам роли."
-			} else {
-				players := 0
-				_, err := fmt.Sscanf(update.Message.Text, "%d", &players)
-				if err != nil || players < 8 || players > 10 {
-					msg.Text = "Введите корректное число игроков (от 8 до 10)."
+			if update.Message != nil {
+				// Обработка сообщений
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
+				if update.Message.Text == "/start" {
+					msg.Text = "Привет! Введи количество игроков (от 8 до 10), и я раздам роли."
 				} else {
-					assignedRoles := shuffleRoles(players)
-					responseText := "Роли распределены:\n"
-					for i, role := range assignedRoles {
-						responseText += fmt.Sprintf("Игрок %d: %s\n", i+1, role)
+					players := 0
+					_, err := fmt.Sscanf(update.Message.Text, "%d", &players)
+					if err != nil || players < 8 || players > 10 {
+						msg.Text = "Введите корректное число игроков (от 8 до 10)."
+					} else {
+						assignedRoles := shuffleRoles(players)
+						responseText := "Роли распределены:\n"
+						for i, role := range assignedRoles {
+							responseText += fmt.Sprintf("Игрок %d: %s\n", i+1, role)
+						}
+						msg.Text = responseText
 					}
-					msg.Text = responseText
 				}
+				bot.Send(msg)
 			}
-			bot.Send(msg)
 		}
-	}
+	}()
 
 	// Health Check endpoint для Cloud Run
 	http.HandleFunc("/health", healthCheck)
